@@ -1,46 +1,58 @@
-# 7-day personal route — AWS for a multi-cloud DevOps profile
+# 7-day personal route — real E2E delivery on AWS (multi-cloud + SAA-C03 edition)
 
 Built with the **"personal route architect"** prompt:
 
-> My goal is **to answer "what about AWS?" confidently in a multi-cloud DevOps interview and progress on SAA-C03**: to **explain the AWS twin of my Azure platform and 10 Azure ↔ AWS differences in English, and score ≥ 75% on SAA-C03 practice questions for domains 1 (secure) and 2 (resilient)** within **7 days** — not to learn AWS in general.
-> I already master **Azure DevOps, GitHub Actions (GH-200), Terraform, Azure platform concepts, and SAA-C03 study basics (EC2, IAM fundamentals)**.
-> Build a 7-day route with one daily task of **at most 45 minutes**, a success criterion, and what NOT to do. Redo it until it leads to the goal.
+> My goal is **to answer "what about AWS?" with real experience in a multi-cloud DevOps interview and progress on SAA-C03**: to **deploy the AWS twin platform, ship features from a feature branch to production on EKS through PRs, CI, GitOps and smoke tests, and explain the Azure ↔ AWS differences I hit** within **7 days** — not to learn AWS in general.
+> I already master **Azure DevOps, GitHub Actions (GH-200), Terraform, Azure platform concepts, and SAA-C03 basics (EC2, IAM fundamentals)**.
+> Build a 7-day route with one daily task of **at most 45 minutes of attention**, a success criterion, and what NOT to do. Redo it until it leads to the goal.
 
 ## Rules of the route
 
-- **45 minutes, timer on.** Stop when it rings; log what was left.
-- **Exam questions under exam conditions:** ~2 minutes per question, no notes, then review **every** wrong answer (why the right one is right *and* why yours is wrong).
-- **Hands-on only where it pays off:** one cheap session (day 3). No EKS, NAT or CloudFront deployments in this route — they cost money and time that the goal does not need.
-- **Mistakes log:** every wrong practice question goes to your SAA-C03 mistakes file with the rule you missed.
-- **Re-plan rule:** a failed criterion is redone in the first 15 minutes of the next day; day 7 produces the gap list for the next route.
+- **45 minutes of attention per day**; long applies (EKS ≈ 15 min, RDS ≈ 10 min) run **unattended**.
+- **Every change is a commit** — flow in [E2E-FEATURE-FLOW.md](E2E-FEATURE-FLOW.md).
+- **Keep the platform up from day 2 to day 6.** EKS cannot be "stopped" like AKS: the control plane (~US$0.10/h) and the NAT gateway (~US$0.045/h) bill continuously. At night, scale nodes to zero to save the biggest part:
+  ```powershell
+  aws eks update-nodegroup-config --cluster-name eks-mfs-portal-lab --nodegroup-name <name> --scaling-config minSize=0,maxSize=3,desiredSize=0   # evening
+  aws eks update-nodegroup-config --cluster-name eks-mfs-portal-lab --nodegroup-name <name> --scaling-config minSize=1,maxSize=3,desiredSize=2   # morning
+  ```
+  Estimated week: **≈ US$20–30**. **No CloudFront/WAF** this week — PostSync smoke is the verification; `smoke.yml` skips.
+- **SAA tie-in (10 min/day):** 5 practice questions on the service you touched that day; wrong answers go to your mistakes log.
+- **Re-plan rule:** a failed criterion moves to the first slot of the next day.
 
 ## The route
 
-| Day | Task (≤ 45 min) | Success criterion | Don't |
-|---:|---|---|---|
-| 1 | **Mapping.** Read `docs/AZURE-AWS-MAPPING.md` (15 min). Pick 10 rows and explain each difference out loud, "in Azure… in AWS… it matters because…" (30 min). | **8 of 10** differences explained with *why it matters* (cost, security, resilience), in English, ≤ 45 s each. | Don't recite service names without the "why". Don't try to cover every row. |
-| 2 | **IAM (D1).** Read `05-identity/main.tf` and lab 02 concepts (15 min). Whiteboard the policy evaluation order (identity ∩ boundary ∩ SCP, explicit deny wins) (10 min). 10 D1 practice questions on IAM/federation (20 min). | Evaluation logic drawn correctly from memory; can explain the **CreateRole escalation gap**; **≥ 7/10** questions. | Don't memorize managed policy names. Don't read IAM docs end to end. |
-| 3 | **Cheap hands-on.** `aws sso login`, `./scripts/awp.ps1 bootstrap` (S3 state + Route 53 zone + budget), then `./scripts/awp.ps1 plan 10-network` and read the plan (no apply). | State bucket exists with versioning; you can point to the **`.tflock`** behaviour and explain **3 resources** of the network plan (route tables, NAT, endpoint). Cost of the day ≈ cents. | Don't `apply` 10-network or anything beyond. Don't debug SSO for more than 15 min — fall back to reading the plan in the lab doc. |
-| 4 | **VPC & DNS (D1/D2).** Lab 03 concepts + Route 53 routing policies (15 min). 10 practice questions: subnets, NAT, endpoints, SG vs NACL, Route 53 (25 min). Review mistakes (5 min). | **≥ 7/10**; can explain gateway vs interface endpoint cost and NAT per AZ in ≤ 60 s. | Don't study Direct Connect/VPN details yet. Don't redraw the whole VPC. |
-| 5 | **Compute, containers, data (D2/D3).** Answers C13–C18 and D19–D21 out loud (25 min). 10 practice questions on Multi-AZ vs read replicas, Auto Scaling, ALB vs NLB (20 min). | **≥ 7/10**; Pod Identity vs IRSA and Multi-AZ vs read replica each explained in ≤ 60 s. | Don't go deep on Kubernetes internals — the exam tests AWS choices. |
-| 6 | **Edge & resilience (D2).** Lab 10 concepts (10 min). Design question F30 out loud, timed (10 min). 10 practice questions: CloudFront, Route 53 failover, backups/DR (RTO/RPO) (25 min). | Design answer starts with **clarifying questions** and ends with a **trade-off**; **≥ 7/10** questions. | Don't memorize CloudFront price classes or WAF rule names. |
-| 7 | **Mock.** 15 mixed D1/D2 practice questions under exam timing (30 min). 2-minute multi-cloud pitch from `docs/interview/01-pitch.md` (5 min). Gap list (10 min). Then `terraform -chdir=infra/terraform/00-bootstrap destroy` if you won't continue soon. | **≥ 75% (12/15)**; pitch ≤ 2:15 with at least 2 Azure↔AWS differences; gap list ≤ 3 items. | Don't start a new topic. Don't leave resources running. |
+| Day | Task (≤ 45 min attention) | Success criterion | SAA tie-in | Don't |
+|---:|---|---|---|---|
+| 1 | **Foundation.** IAM Identity Center + `aws sso login` → `awp.ps1 bootstrap` → NS delegation of `aws.edymonte.com.br` → `apply 05-identity` → GitHub variables + `lab` environment → public repo + branch protection. Start `up -Through 30-data` unattended. | State in S3 with `.tflock` behaviour seen; OIDC provider + plan/deploy roles with boundary; layers 05–30 applied. | IAM federation, permissions boundaries (D1) | Don't create IAM users with access keys. |
+| 2 | **First deploy, part 1.** `apply 40-eks` (unattended) → `render-gitops-values.ps1` PR → `build-images.ps1 -Tag v1.0.0` (Docker) + tags PR. | ECR has both images (immutable tags); Pod Identity associations listed; values PR merged. | ECR, EKS, VPC CNI IP usage (D2/D3) | Don't apply 50/60 yet. |
+| 3 | **First deploy, part 2 + FEAT-01.** `bootstrap-gitops.ps1` → `db-grant-app-user.ps1` → apps Healthy → FEAT-01 full loop dev → prod. | `SMOKE OK` in dev and prod for `<sha>`; ALB (one, IngressGroup) serving both hosts; evidence block filled. | ALB vs NLB, target-type ip (D3) | Don't push to `main`; don't build a separate prod image. |
+| 4 | **FEAT-03 + FEAT-04 — quality gates.** Bug blocked in PR; bad SQL release passes unit tests, fails PostSync smoke in dev → revert. | Red → green PR; dev sync `Failed` then restored by revert; prod untouched. | RDS Multi-AZ vs read replica, IAM DB auth (D1/D2) | Don't `kubectl rollout undo`. |
+| 5 | **FEAT-05 — infra change with approval.** `portal-qa` (Pod Identity association + GitOps app) via PR plan comment → merge → `infra` workflow apply with approval. | Plan `1 to add, 0 to destroy`; approval recorded; `portal-qa` Healthy and connecting to RDS. | Least privilege, plan vs deploy roles (D1) | Don't apply from the laptop this time. |
+| 6 | **FEAT-07 rollback drill + Azure↔AWS write-up.** Inject latency via deploy PR → detect (AMP alert if 60 is up, else pod metrics/logs) → `git revert`. Then write 5 differences you actually hit vs the Azure lab. | Revert restores latency; 5 differences written with "why it matters". | Monitoring choices, CloudWatch vs AMP (D2) | Don't apply CloudFront for this. |
+| 7 | **Mock + teardown.** Mock (30 min): "Have you worked with AWS?" → E2E story (FEAT-01 + FEAT-04) → 5 differences → 10 SAA questions. Then `awp.ps1 down` (removes the ALB first) — confirm no ALB/NAT left. | ≥ 7/10 SAA; multi-cloud answer ≤ 2 min; `aws elbv2 describe-load-balancers` and NAT list empty. | Mixed D1/D2 | Don't leave NAT or EKS running. |
 
-## Redo loop (until the goal)
+## What this route skips (and when)
 
-1. Each gap → a 45-minute task with a criterion.
-2. Repeat days with failed criteria before moving on; keep the mistakes log growing — it is the real study material.
-3. Ask the assistant: *"Redo the AWS route with these gaps and scores: …"* until day 7 passes twice in a row.
-4. After that, the full lab (phases 05–13) becomes the deeper, hands-on route.
+| Skipped | Lab phase | When |
+|---|---|---|
+| CloudFront + WAF + Route 53 failover, public smoke test | 10 | after, 1 day, then destroy |
+| Config/GuardDuty/Security Hub hands-on | 04 | 1 hour later; read the lab now |
+| AMP + Grafana dashboards | 11 | optional on day 6 if time |
+| Datadog | 12 | after |
+| Azure DevOps → AWS | 09 | after the Azure route's day 6 (same concepts) |
+
+## Redo loop
+
+Bring the gap list and SAA scores back: *"Redo the AWS route with these gaps and scores: …"* — repeat until the mock passes twice.
 
 ## Daily log
 
-| Day | Score / criterion | What failed | Redo tomorrow? |
-|---:|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
-| 6 | | | |
-| 7 | | | |
+| Day | Criterion met? | Evidence (PR / run) | SAA score | What failed → redo |
+|---:|---|---|---|---|
+| 1 | | | | |
+| 2 | | | | |
+| 3 | | | | |
+| 4 | | | | |
+| 5 | | | | |
+| 6 | | | | |
+| 7 | | | | |

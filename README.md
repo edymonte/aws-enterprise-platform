@@ -54,5 +54,6 @@ $env:AWS_PROFILE = 'mfs-lab'; aws sso login
 
 ## Documentation
 
+- **[E2E feature flow — feature branch to production](docs/E2E-FEATURE-FLOW.md)**
 - [How it works](docs/HOW-IT-WORKS.md) · [Azure ↔ AWS mapping](docs/AZURE-AWS-MAPPING.md) · [Costs](docs/costs.md) · [Runbook](docs/runbook.md)
 - [Game days](docs/game-days.md) · [ADRs](docs/decisions/) · [Interview pack (AWS)](docs/interview/README.md) · [7-day personal route](docs/ROUTE-7-DAYS.md)

@@ -57,6 +57,10 @@ datadog:
   enabled: false
   agentHost: datadog-agent.datadog.svc.cluster.local
 
+smokeTest:
+  enabled: true          # Argo CD PostSync verification (templates/smoke-test.yaml)
+  image: curlimages/curl:8.11.1
+
 networkPolicy:
   enabled: true
   allowedCidrs: []                # VPC CIDR: ALB (target-type ip) + AMP collector ENIs
