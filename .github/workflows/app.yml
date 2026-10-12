@@ -48,7 +48,7 @@ jobs:
           docker build -t $REG/customer-portal-web:$TAG app/customer-portal/web
 
       - name: Scan image (fail on CRITICAL)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.ecr.outputs.registry }}/customer-portal-api:${{ github.sha }}
           severity: CRITICAL
