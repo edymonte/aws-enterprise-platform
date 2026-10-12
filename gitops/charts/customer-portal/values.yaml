@@ -1,0 +1,62 @@
+# Defaults. Each environment overrides them with two files:
+#   gitops/envs/<env>/platform.values.yaml  -> generated from Terraform outputs (scripts/render-gitops-values.ps1)
+#   gitops/envs/<env>/values.yaml           -> app config (image tags, replicas, chaos) changed by PRs / CI
+environment: dev
+region: us-east-1
+
+image:
+  registry: ""            # <account>.dkr.ecr.<region>.amazonaws.com (platform.values.yaml)
+  api:
+    repository: customer-portal-api
+    tag: "bootstrap"
+  web:
+    repository: customer-portal-web
+    tag: "bootstrap"
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  host: ""
+  groupName: mfs-portal           # dev and prod share ONE ALB (IngressGroup)
+  albName: alb-mfs-portal-lab     # deterministic name: 50-edge looks the ALB up by it
+  securityGroupId: ""             # CloudFront-only SG from 40-eks (platform.values.yaml)
+
+database:
+  host: ""                        # empty = API runs with the in-memory catalog
+  port: 5432
+  name: portal
+  user: portal_api
+
+secrets:
+  bannerSecretName: ""            # Secrets Manager name; empty = no CSI volume
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+web:
+  replicas: 2
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { cpu: 100m, memory: 64Mi }
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 60
+
+# Game-day switches (change through a Git PR, never with kubectl)
+chaos:
+  errorRate: "0"
+  latencyMs: "0"
+
+datadog:
+  enabled: false
+  agentHost: datadog-agent.datadog.svc.cluster.local
+
+networkPolicy:
+  enabled: true
+  allowedCidrs: []                # VPC CIDR: ALB (target-type ip) + AMP collector ENIs

@@ -1,0 +1,106 @@
+{{- if .Values.ingress.enabled }}
+# AWS Load Balancer Controller turns this into an ALB.
+# dev and prod join the same IngressGroup -> ONE ALB, host-based rules.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: customer-portal
+  labels:
+    {{- include "portal.labels" . | nindent 4 }}
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.groupName | quote }}
+    alb.ingress.kubernetes.io/load-balancer-name: {{ .Values.ingress.albName | quote }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    {{- if .Values.ingress.securityGroupId }}
+    # Terraform-managed SG: HTTP only from the CloudFront origin-facing prefix list
+    alb.ingress.kubernetes.io/security-groups: {{ .Values.ingress.securityGroupId | quote }}
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
+    {{- end }}
+spec:
+  ingressClassName: alb
+  rules:
+    - host: {{ required "ingress.host is required" .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: customer-portal-api
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: customer-portal-web
+                port:
+                  name: http
+{{- end }}
+{{- if .Values.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: customer-portal-api
+  labels:
+    {{- include "portal.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: customer-portal-api
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.targetCPUUtilizationPercentage }}
+{{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: customer-portal-api
+  labels:
+    {{- include "portal.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: customer-portal-api
+{{- if .Values.networkPolicy.enabled }}
+---
+# Enforced by the VPC CNI network policy agent (enableNetworkPolicy=true in 40-eks).
+# The ALB (target-type ip) and the AMP collector reach pods from VPC IPs, not from pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: customer-portal-allow-ingress
+  labels:
+    {{- include "portal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: customer-portal
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.allowedCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: ["datadog", "kube-system"]
+      ports:
+        - port: 8080
+          protocol: TCP
+{{- end }}

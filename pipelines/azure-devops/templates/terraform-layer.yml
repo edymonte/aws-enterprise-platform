@@ -1,0 +1,48 @@
+# Reusable STEPS template: init + plan (+ apply) of one Terraform layer on AWS.
+#
+# Authentication: AWS Toolkit for Azure DevOps service connection configured
+# with "Use OIDC" + role ARN (05-identity output ado_role_arn). The task
+# exchanges the Azure DevOps OIDC token for temporary STS credentials and
+# exports them to the script — no access keys stored anywhere.
+parameters:
+  - name: layer
+    type: string
+  - name: action          # plan | apply | destroy
+    type: string
+    default: plan
+  - name: awsConnection
+    type: string
+
+steps:
+  - task: TerraformInstaller@1
+    displayName: Install Terraform 1.12.2
+    inputs:
+      terraformVersion: 1.12.2
+
+  - task: AWSShellScript@1
+    displayName: terraform ${{ parameters.action }} ${{ parameters.layer }}
+    inputs:
+      awsCredentials: ${{ parameters.awsConnection }}
+      regionName: $(AWS_REGION)
+      scriptType: inline
+      inlineScript: |
+        set -euo pipefail
+        export TF_IN_AUTOMATION=true
+        ./scripts/ci-write-runtime.sh
+        cd infra/terraform/${{ parameters.layer }}
+        terraform init -input=false \
+          -backend-config=../../../.runtime/backend.hcl \
+          -backend-config=key=${{ parameters.layer }}.tfstate
+
+        DESTROY=""
+        if [ "${{ parameters.action }}" = "destroy" ]; then DESTROY="-destroy"; fi
+        terraform plan $DESTROY -input=false -out=tfplan -var-file=../../../.runtime/common.tfvars.json
+        if [ "${{ parameters.action }}" != "plan" ]; then
+          terraform apply -input=false tfplan
+        fi
+    env:
+      TF_STATE_BUCKET: $(TF_STATE_BUCKET)
+      AWS_REGION: $(AWS_REGION)
+      ALERT_EMAIL: $(ALERT_EMAIL)
+      OPERATOR_IP_RANGES: $(OPERATOR_IP_RANGES)
+      NAME_SUFFIX: $(NAME_SUFFIX)

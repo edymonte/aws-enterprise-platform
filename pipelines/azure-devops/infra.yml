@@ -1,0 +1,83 @@
+# Azure DevOps — infrastructure pipeline targeting AWS (same behaviour as .github/workflows/infra.yml)
+#
+#   Stage Validate : fmt + validate (no credentials)
+#   Stage Plan     : terraform plan with the AWS OIDC service connection
+#   Stage Apply    : deployment job on environment 'mfs-aws-lab' -> approval check
+#
+# Setup (docs/labs/09-azure-devops.md):
+#   - extension      AWS Toolkit for Azure DevOps (Marketplace)
+#   - connection     aws-mfs-lab-oidc  (AWS, "Use OIDC", role = 05-identity ado_role_arn)
+#   - variable group mfs-aws-common    (TF_STATE_BUCKET, AWS_REGION, ALERT_EMAIL, OPERATOR_IP_RANGES, NAME_SUFFIX)
+#   - environment    mfs-aws-lab       (Approvals and checks -> Approvals)
+
+trigger: none
+
+pr:
+  branches:
+    include: [main]
+  paths:
+    include: [infra/*]
+
+parameters:
+  - name: layer
+    displayName: Terraform layer
+    type: string
+    default: 10-network
+    values: [10-network, 20-governance, 30-data, 40-eks, 50-edge, 60-observability]
+  - name: action
+    displayName: Action
+    type: string
+    default: plan
+    values: [plan, apply, destroy]
+
+variables:
+  - group: mfs-aws-common
+  - name: awsConnection
+    value: aws-mfs-lab-oidc
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Validate
+    jobs:
+      - job: fmt_validate
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: 1.12.2
+          - bash: |
+              set -euo pipefail
+              cd infra/terraform/${{ parameters.layer }}
+              terraform fmt -check -diff
+              terraform init -backend=false -input=false
+              terraform validate
+            displayName: fmt + validate
+
+  - stage: Plan
+    dependsOn: Validate
+    jobs:
+      - job: plan
+        steps:
+          - template: templates/terraform-layer.yml
+            parameters:
+              layer: ${{ parameters.layer }}
+              action: plan
+              awsConnection: ${{ variables.awsConnection }}  # compile-time: required for service connection authorization
+
+  - stage: Apply
+    dependsOn: Plan
+    condition: and(succeeded(), ne('${{ parameters.action }}', 'plan'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: apply
+        environment: mfs-aws-lab
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - template: templates/terraform-layer.yml
+                  parameters:
+                    layer: ${{ parameters.layer }}
+                    action: ${{ parameters.action }}
+                    awsConnection: ${{ variables.awsConnection }}

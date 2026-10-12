@@ -1,0 +1,6 @@
+# AWS Config custom policy rule (CloudFormation Guard 2.x).
+# Every RDS instance must have IAM database authentication enabled,
+# so applications connect with short-lived tokens instead of passwords.
+rule rds_iam_auth_enabled when resourceType == "AWS::RDS::DBInstance" {
+  configuration.iAMDatabaseAuthenticationEnabled == true
+}

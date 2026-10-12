@@ -1,0 +1,33 @@
+# Grafana in the cluster, querying Amazon Managed Prometheus with SigV4.
+# Credentials: EKS Pod Identity (namespace grafana, SA grafana -> 60-observability role).
+serviceAccount:
+  create: true
+  name: grafana
+
+grafana.ini:
+  auth:
+    sigv4_auth_enabled: true
+
+env:
+  AWS_REGION: us-east-1
+
+persistence:
+  enabled: false
+
+# Dashboards as code: loaded straight from this Git repository.
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: MFS
+        type: file
+        disableDeletion: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    customer-portal:
+      url: https://raw.githubusercontent.com/edymonte/aws-enterprise-platform/main/observability/dashboards/grafana-customer-portal.json
